@@ -112,8 +112,9 @@ class TransformerSeq2Seq(nn.Module):
         bos_id: int = None,
         eos_id: int = None,
         min_len: int = 3,
-        no_repeat_ngram_size: int = 3,
-        repetition_penalty: float = 1.15,
+        no_repeat_ngram_size: int = 2,      # Reduced from 3 - blocks repetition earlier
+        repetition_penalty: float = 1.5,     # Increased from 1.15 - stronger penalty
+        temperature: float = 0.7,            # NEW - adds diversity
     ):
         """
         Greedy decoding + anti-repetition controls.
@@ -163,7 +164,13 @@ class TransformerSeq2Seq(nn.Module):
             if step < min_len:
                 next_logits[:, eos_id] = torch.finfo(next_logits.dtype).min
 
-            next_token = torch.argmax(next_logits, dim=-1)
+            # Apply temperature and sample (instead of pure greedy)
+            if temperature > 0:
+                next_logits = next_logits / temperature
+                probs = torch.softmax(next_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1).squeeze(-1)
+            else:
+                next_token = torch.argmax(next_logits, dim=-1)
 
             next_token = torch.where(
                 finished,
