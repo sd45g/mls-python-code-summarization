@@ -1,5 +1,5 @@
 """
-Evaluate trained model on test set and compute ROUGE scores.
+Evaluate trained model on test set and compute ROUGE and BLEU scores.
 Run this after training to measure model quality.
 """
 
@@ -20,6 +20,17 @@ except ImportError:
     os.system("pip install rouge-score")
     from rouge_score import rouge_scorer
 
+try:
+    from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+    import nltk
+    nltk.download('punkt', quiet=True)
+except ImportError:
+    print("Installing nltk...")
+    os.system("pip install nltk")
+    from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+    import nltk
+    nltk.download('punkt', quiet=True)
+
 
 def evaluate_model(
     model_path: str,
@@ -29,7 +40,7 @@ def evaluate_model(
     max_samples: int = 1000,
 ):
     """
-    Evaluate model on test data and compute ROUGE scores.
+    Evaluate model on test data and compute ROUGE and BLEU scores.
     """
     print(f"Loading model from {model_path}...")
     model, tokenizer = load_inference_model_transformer(model_path, tokenizer_path, device)
@@ -50,8 +61,9 @@ def evaluate_model(
     print(f"Evaluating on {len(examples)} samples...")
     
     scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+    smoothing = SmoothingFunction().method1  # Smoothing for short sentences
     
-    all_scores = {'rouge1': [], 'rouge2': [], 'rougeL': []}
+    all_scores = {'rouge1': [], 'rouge2': [], 'rougeL': [], 'bleu': []}
     predictions = []
     references = []
     
@@ -70,8 +82,17 @@ def evaluate_model(
         
         # Compute ROUGE scores
         scores = scorer.score(reference, prediction)
-        for key in all_scores:
+        for key in ['rouge1', 'rouge2', 'rougeL']:
             all_scores[key].append(scores[key].fmeasure)
+        
+        # Compute BLEU score
+        ref_tokens = reference.lower().split()
+        pred_tokens = prediction.lower().split()
+        if len(pred_tokens) > 0:
+            bleu = sentence_bleu([ref_tokens], pred_tokens, smoothing_function=smoothing)
+        else:
+            bleu = 0.0
+        all_scores['bleu'].append(bleu)
     
     # Compute averages
     avg_scores = {}
@@ -79,11 +100,13 @@ def evaluate_model(
         avg_scores[key] = sum(all_scores[key]) / len(all_scores[key])
     
     print("\n" + "="*50)
-    print("ROUGE SCORES")
+    print("EVALUATION SCORES")
     print("="*50)
     print(f"ROUGE-1: {avg_scores['rouge1']:.4f}")
     print(f"ROUGE-2: {avg_scores['rouge2']:.4f}")
     print(f"ROUGE-L: {avg_scores['rougeL']:.4f}")
+    print("-"*50)
+    print(f"BLEU:    {avg_scores['bleu']:.4f}")
     print("="*50)
     
     # Show some examples

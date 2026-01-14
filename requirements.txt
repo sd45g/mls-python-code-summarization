@@ -4,3 +4,4 @@ datasets
 tokenizers
 tqdm
 rouge-score
+nltk
