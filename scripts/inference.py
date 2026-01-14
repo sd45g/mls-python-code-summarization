@@ -24,11 +24,11 @@ def load_inference_model_transformer(model_path: str, tokenizer_path: str, devic
     # IMPORTANT: must match training config exactly
     model = TransformerSeq2Seq(
         vocab_size=vocab_size,
-        d_model=256,
+        d_model=512,          # Must match train.py
         nhead=8,
-        num_encoder_layers=4,
-        num_decoder_layers=4,
-        dim_feedforward=1024,
+        num_encoder_layers=6, # Must match train.py
+        num_decoder_layers=6, # Must match train.py
+        dim_feedforward=2048, # Must match train.py
         dropout=0.0,
         pad_id=pad_id,
     ).to(device)
@@ -62,8 +62,10 @@ def summarize_code_transformer(
         raise ValueError("Tokenizer must contain [BOS], [EOS], [PAD]")
 
     # Encode + pad source
+    # CRITICAL: Must add BOS/EOS tokens to match training format!
     enc = tokenizer.encode(code)
-    ids = enc.ids[:max_src_len]
+    ids = enc.ids[:max_src_len - 2]  # Leave room for BOS and EOS
+    ids = [bos_id] + ids + [eos_id]  # Add BOS/EOS like training does
     if len(ids) < max_src_len:
         ids = ids + [pad_id] * (max_src_len - len(ids))
 

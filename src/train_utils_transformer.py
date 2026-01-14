@@ -156,7 +156,8 @@ def train_model(
     )
 
     criterion = nn.CrossEntropyLoss(ignore_index=pad_id, label_smoothing=0.1)
-    early_stopping = EarlyStopping(patience=4, min_delta=0.001)
+    # IMPROVED: More patience to allow longer training
+    early_stopping = EarlyStopping(patience=8, min_delta=0.0005)
     os.makedirs(save_dir, exist_ok=True)
 
     start_epoch = 1

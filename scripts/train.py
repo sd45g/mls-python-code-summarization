@@ -100,18 +100,20 @@ def main():
     max_src_len = 256
     max_tgt_len = 64
 
-    epochs_total = 60
-    lr = 1e-4
+    # IMPROVED: More epochs, better LR
+    epochs_total = 100
+    lr = 3e-4  # Will use warmup scheduler
     weight_decay = 0.01
     clip_grad = 1.0
     log_every = 200
 
-    SUBSET_TRAIN = 50_000
-    SUBSET_VAL = 8_000
+    # IMPROVED: More training data
+    SUBSET_TRAIN = 100_000
+    SUBSET_VAL = 10_000
     SEED = 42
 
     # --- GOOGLE DRIVE PATH ---
-    SAVE_DIR = "/content/drive/MyDrive/ml-python-code-summarization/models_transformer_fromscratch"
+    SAVE_DIR = "/content/drive/MyDrive/mls-python-code-summarization/models"
     RESUME_PATH = f"{SAVE_DIR}/last.pt"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -160,13 +162,14 @@ def main():
     )
 
     print("Initializing Transformer model...")
+    # IMPROVED: Larger model for better code understanding
     model = TransformerSeq2Seq(
         vocab_size=vocab_size,
-        d_model=256,
+        d_model=512,          # Increased from 256
         nhead=8,
-        num_encoder_layers=4,
-        num_decoder_layers=4,
-        dim_feedforward=1024,
+        num_encoder_layers=6, # Increased from 4
+        num_decoder_layers=6, # Increased from 4
+        dim_feedforward=2048, # Increased from 1024
         dropout=0.1,
         pad_id=pad_id
     ).to(device)
