@@ -1,5 +1,5 @@
 """
-Evaluate trained model on test set and compute ROUGE and BLEU scores.
+Evaluate trained model on test set and compute ROUGE, BLEU, and METEOR scores.
 Run this after training to measure model quality.
 """
 
@@ -22,14 +22,18 @@ except ImportError:
 
 try:
     from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+    from nltk.translate.meteor_score import meteor_score
     import nltk
     nltk.download('punkt', quiet=True)
+    nltk.download('wordnet', quiet=True)
 except ImportError:
     print("Installing nltk...")
     os.system("pip install nltk")
     from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+    from nltk.translate.meteor_score import meteor_score
     import nltk
     nltk.download('punkt', quiet=True)
+    nltk.download('wordnet', quiet=True)
 
 
 def evaluate_model(
@@ -40,7 +44,7 @@ def evaluate_model(
     max_samples: int = 1000,
 ):
     """
-    Evaluate model on test data and compute ROUGE and BLEU scores.
+    Evaluate model on test data and compute ROUGE, BLEU, and METEOR scores.
     """
     print(f"Loading model from {model_path}...")
     model, tokenizer = load_inference_model_transformer(model_path, tokenizer_path, device)
@@ -63,7 +67,7 @@ def evaluate_model(
     scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
     smoothing = SmoothingFunction().method1  # Smoothing for short sentences
     
-    all_scores = {'rouge1': [], 'rouge2': [], 'rougeL': [], 'bleu': []}
+    all_scores = {'rouge1': [], 'rouge2': [], 'rougeL': [], 'bleu': [], 'meteor': []}
     predictions = []
     references = []
     
@@ -90,9 +94,13 @@ def evaluate_model(
         pred_tokens = prediction.lower().split()
         if len(pred_tokens) > 0:
             bleu = sentence_bleu([ref_tokens], pred_tokens, smoothing_function=smoothing)
+            # Compute METEOR score (handles synonyms and stemming)
+            meteor = meteor_score([ref_tokens], pred_tokens)
         else:
             bleu = 0.0
+            meteor = 0.0
         all_scores['bleu'].append(bleu)
+        all_scores['meteor'].append(meteor)
     
     # Compute averages
     avg_scores = {}
@@ -102,11 +110,14 @@ def evaluate_model(
     print("\n" + "="*50)
     print("EVALUATION SCORES")
     print("="*50)
-    print(f"ROUGE-1: {avg_scores['rouge1']:.4f}")
-    print(f"ROUGE-2: {avg_scores['rouge2']:.4f}")
-    print(f"ROUGE-L: {avg_scores['rougeL']:.4f}")
+    print("ROUGE Scores:")
+    print(f"  ROUGE-1: {avg_scores['rouge1']:.4f}")
+    print(f"  ROUGE-2: {avg_scores['rouge2']:.4f}")
+    print(f"  ROUGE-L: {avg_scores['rougeL']:.4f}")
     print("-"*50)
-    print(f"BLEU:    {avg_scores['bleu']:.4f}")
+    print("Other Metrics:")
+    print(f"  BLEU:    {avg_scores['bleu']:.4f}")
+    print(f"  METEOR:  {avg_scores['meteor']:.4f}")
     print("="*50)
     
     # Show some examples
