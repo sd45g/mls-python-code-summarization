@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import torch
 from torch.utils.data import DataLoader
-from src.dataset import CodeSummaryDataset, collate_fn
+from src.data import JsonlCodeSummaryDataset, Collator
 
 def main():
     data_path = "data/processed/codesearchnet_clean/train.jsonl"
@@ -16,35 +16,36 @@ def main():
         return
 
     print("Initializing Dataset...")
-    dataset = CodeSummaryDataset(data_path, tokenizer_path)
+    dataset = JsonlCodeSummaryDataset(data_path)
+    collator = Collator(tokenizer_path)
     print(f"Dataset size: {len(dataset)}")
     
     # Check one item
     item = dataset[0]
     print("Sample Item Keys:", item.keys())
-    print("Source IDs:", item['source_ids'][:10], "...")
+    print("Code preview:", item.get('code', '')[:50], "...")
     
     # DataLoader
-    pad_id = dataset.pad_id
-    loader = DataLoader(dataset, batch_size=4, collate_fn=lambda b: collate_fn(b, pad_id))
+    pad_id = collator.pad_id
+    loader = DataLoader(dataset, batch_size=4, collate_fn=collator)
     
     print("\nChecking DataLoader batch...")
     batch = next(iter(loader))
-    print("Batch keys:", batch.keys())
-    print("Source Shape:", batch['source_ids'].shape)
-    print("Target Shape:", batch['target_ids'].shape)
+    print("Batch attributes: src_ids, src_mask, tgt_ids")
+    print("Source Shape:", batch.src_ids.shape)
+    print("Target Shape:", batch.tgt_ids.shape)
     
     # Decode back
     print("\nDecoding first sample in batch:")
-    src_ids = batch['source_ids'][0]
-    tgt_ids = batch['target_ids'][0]
+    src_ids = batch.src_ids[0]
+    tgt_ids = batch.tgt_ids[0]
     
     # Remove pad
     src_ids = src_ids[src_ids != pad_id]
     tgt_ids = tgt_ids[tgt_ids != pad_id]
     
-    src_text = dataset.tokenizer.decode(src_ids.tolist())
-    tgt_text = dataset.tokenizer.decode(tgt_ids.tolist())
+    src_text = collator.tokenizer.decode(src_ids.tolist())
+    tgt_text = collator.tokenizer.decode(tgt_ids.tolist())
     
     print(f"Source: {src_text[:100]}...")
     print(f"Target: {tgt_text}")

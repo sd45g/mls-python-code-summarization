@@ -103,7 +103,7 @@ def main():
     # IMPROVED: More epochs, better LR
     epochs_total = 100
     lr = 3e-4  # Will use warmup scheduler
-    weight_decay = 0.01
+    weight_decay = 0.05  # ANTI-OVERFIT: Increased from 0.01
     clip_grad = 1.0
     log_every = 200
 
@@ -112,8 +112,11 @@ def main():
     SUBSET_VAL = 10_000
     SEED = 42
 
-    # --- GOOGLE DRIVE PATH ---
+    # --- SAVE PATHS ---
+    # Primary: Google Drive (Colab persistence)
     SAVE_DIR = "/content/drive/MyDrive/mls-python-code-summarization/models"
+    # Secondary: Local models folder (for GitHub repo)
+    LOCAL_SAVE_DIR = "models"
     RESUME_PATH = f"{SAVE_DIR}/last.pt"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -121,9 +124,11 @@ def main():
     print(f"Train file: {train_path}")
     print(f"Val file:   {val_path}")
     print(f"Resume: {RESUME_PATH}")
-    print(f"Save dir: {SAVE_DIR}")
+    print(f"Save dir (Drive): {SAVE_DIR}")
+    print(f"Save dir (Local): {LOCAL_SAVE_DIR}")
 
     os.makedirs(SAVE_DIR, exist_ok=True)
+    os.makedirs(LOCAL_SAVE_DIR, exist_ok=True)
 
     collator = Collator(tokenizer_path, max_src_len=max_src_len, max_tgt_len=max_tgt_len)
     pad_id = collator.pad_id
@@ -170,7 +175,7 @@ def main():
         num_encoder_layers=6, # Increased from 4
         num_decoder_layers=6, # Increased from 4
         dim_feedforward=2048, # Increased from 1024
-        dropout=0.1,
+        dropout=0.3,          # ANTI-OVERFIT: Increased from 0.1
         pad_id=pad_id
     ).to(device)
 
@@ -185,10 +190,35 @@ def main():
         lr=lr,
         weight_decay=weight_decay,
         save_dir=SAVE_DIR,
+        local_save_dir=LOCAL_SAVE_DIR,
         resume_path=RESUME_PATH,
         log_every=log_every,
         clip_grad=clip_grad
     )
+
+    # ========== VERIFICATION: Confirm model was saved ==========
+    print("\n" + "="*60)
+    print("VERIFYING MODEL FILES")
+    print("="*60)
+    
+    for label, dir_path in [("Google Drive", SAVE_DIR), ("Local (models/)", LOCAL_SAVE_DIR)]:
+        if os.path.exists(dir_path):
+            files = [f for f in os.listdir(dir_path) if f.endswith('.pt')]
+            if files:
+                print(f"\n✅ {label}: {dir_path}")
+                for f in files:
+                    fpath = os.path.join(dir_path, f)
+                    size_mb = os.path.getsize(fpath) / (1024 * 1024)
+                    print(f"   📁 {f}: {size_mb:.2f} MB")
+            else:
+                print(f"\n❌ {label}: No .pt files found in {dir_path}")
+        else:
+            print(f"\n❌ {label}: Directory does NOT exist: {dir_path}")
+    
+    print("\n" + "="*60)
+    print("✅ Training complete!")
+    print("="*60)
+
 
 
 if __name__ == "__main__":

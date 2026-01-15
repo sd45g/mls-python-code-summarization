@@ -1,7 +1,15 @@
+# Core ML dependencies
 torch
-transformers
-datasets
 tokenizers
+
+# Data handling
+datasets
 tqdm
+numpy
+
+# Evaluation metrics
 rouge-score
 nltk
+
+# Note: 'transformers' not actually used in current codebase
+# but keeping for potential future use

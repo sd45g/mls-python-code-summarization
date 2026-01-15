@@ -29,6 +29,7 @@ class EarlyStopping:
 
 
 def save_checkpoint(path, model, optimizer, epoch, val_loss, best_val):
+    """Save checkpoint with forced sync to ensure Google Drive persistence."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     state = {
         "epoch": epoch,
@@ -37,7 +38,30 @@ def save_checkpoint(path, model, optimizer, epoch, val_loss, best_val):
         "val_loss": val_loss,
         "best_val": best_val,
     }
-    torch.save(state, path)
+    
+    # Save to a temp file first, then rename (atomic operation)
+    temp_path = path + ".tmp"
+    torch.save(state, temp_path)
+    
+    # Force sync to disk - critical for Google Drive!
+    try:
+        with open(temp_path, 'rb') as f:
+            os.fsync(f.fileno())
+    except Exception:
+        pass  # fsync may fail on some systems, but save still works
+    
+    # Atomic rename (safer than direct overwrite)
+    if os.path.exists(path):
+        os.remove(path)
+    os.rename(temp_path, path)
+    
+    # Verify the file was saved
+    if os.path.exists(path):
+        size_mb = os.path.getsize(path) / (1024 * 1024)
+        print(f"    💾 Saved: {path} ({size_mb:.2f} MB)")
+    else:
+        print(f"    ❌ WARNING: Failed to verify save at {path}")
+
 
 
 def _get(batch, key):
@@ -147,7 +171,7 @@ def run_epoch(
 def train_model(
     model, train_loader, val_loader, device, pad_id,
     epochs_total=10, lr=3e-4, weight_decay=0.01,
-    save_dir="models", log_every=200, clip_grad=1.0,
+    save_dir="models", local_save_dir=None, log_every=200, clip_grad=1.0,
     resume_path=None
 ):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -155,7 +179,8 @@ def train_model(
         optimizer, mode="min", factor=0.5, patience=1, min_lr=1e-6
     )
 
-    criterion = nn.CrossEntropyLoss(ignore_index=pad_id, label_smoothing=0.1)
+    # ANTI-OVERFIT: Increased label smoothing from 0.1 to 0.15
+    criterion = nn.CrossEntropyLoss(ignore_index=pad_id, label_smoothing=0.15)
     # IMPROVED: More patience to allow longer training
     early_stopping = EarlyStopping(patience=8, min_delta=0.0005)
     os.makedirs(save_dir, exist_ok=True)
@@ -208,11 +233,18 @@ def train_model(
         if val_loss < best_val:
             best_val = val_loss
             save_checkpoint(f"{save_dir}/best.pt", model, optimizer, epoch, val_loss, best_val)
+            # Also save to local folder for GitHub
+            if local_save_dir:
+                save_checkpoint(f"{local_save_dir}/best.pt", model, optimizer, epoch, val_loss, best_val)
             print("  ✔ Saved new best model")
 
         save_checkpoint(f"{save_dir}/last.pt", model, optimizer, epoch, val_loss, best_val)
+        # Also save to local folder
+        if local_save_dir:
+            save_checkpoint(f"{local_save_dir}/last.pt", model, optimizer, epoch, val_loss, best_val)
 
         early_stopping(val_loss)
         if early_stopping.early_stop:
             print("Early stopping triggered")
             break
+

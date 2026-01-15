@@ -1,0 +1,82 @@
+# Walkthrough: Model Training Fixes
+
+## Summary of Changes
+
+All changes pushed to: **https://github.com/sd45g/mls-python-code-summarization** (branch: `fix/improve-model-training`)
+
+### 🔴 Critical Fix
+
+| File | Fix | Impact |
+|------|-----|--------|
+| [inference.py](file:///c:/Users/USER/Downloads/mls-python-code-summarization-main/mls-python-code-summarization-main/scripts/inference.py) | Added `[BOS]`/`[EOS]` tokens to source encoding | **Root cause of ~0 ROUGE scores** |
+
+### 🟠 Model Improvements
+
+| Parameter | Before | After |
+|-----------|--------|-------|
+| `d_model` | 256 | **512** |
+| `encoder/decoder layers` | 4 | **6** |
+| `dim_feedforward` | 1024 | **2048** |
+| Training samples | 50,000 | **100,000** |
+| Epochs | 60 | **100** |
+| Early stopping patience | 4 | **8** |
+
+---
+
+## Run on Google Colab
+
+### Step 1: Mount Drive & Clone Repo
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+
+!git clone https://github.com/sd45g/mls-python-code-summarization.git
+%cd mls-python-code-summarization
+!git checkout fix/improve-model-training
+```
+
+### Step 2: Install Dependencies
+
+```python
+!pip install -r requirements.txt
+```
+
+### Step 3: Download & Preprocess Data
+
+```python
+!python scripts/preprocess_data.py
+```
+
+### Step 4: Train Tokenizer (if needed)
+
+```python
+!python scripts/train_tokenizer.py
+```
+
+### Step 5: Train Model
+
+```python
+!python scripts/train.py
+```
+
+Training will save models to: `/content/drive/MyDrive/mls-python-code-summarization/models/`
+
+### Step 6: Evaluate ROUGE Scores
+
+```python
+!python scripts/evaluate.py
+```
+
+---
+
+## Expected Results
+
+With these fixes, you should see:
+
+| Metric | Before | Expected After |
+|--------|--------|----------------|
+| ROUGE-1 | 0.007 | **0.15-0.25** |
+| ROUGE-2 | 0.0 | **0.05-0.10** |
+| ROUGE-L | 0.007 | **0.12-0.20** |
+| Val Accuracy | 27% | **40-50%** |

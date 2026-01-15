@@ -6,6 +6,9 @@ Run this after training to measure model quality.
 import os
 import sys
 import json
+import math
+import torch
+import torch.nn as nn
 from tqdm import tqdm
 
 # Add parent to path
@@ -36,6 +39,54 @@ except ImportError:
     nltk.download('wordnet', quiet=True)
 
 
+def compute_perplexity(model, tokenizer, examples, device, max_src_len=256, max_tgt_len=64):
+    """
+    Compute perplexity on a set of examples.
+    Perplexity = exp(average cross-entropy loss)
+    """
+    bos_id = tokenizer.token_to_id("[BOS]")
+    eos_id = tokenizer.token_to_id("[EOS]")
+    pad_id = tokenizer.token_to_id("[PAD]")
+    
+    criterion = nn.CrossEntropyLoss(ignore_index=pad_id, reduction='sum')
+    total_loss = 0.0
+    total_tokens = 0
+    
+    model.eval()
+    with torch.no_grad():
+        for example in tqdm(examples[:200], desc="Computing perplexity"):  # Limit for speed
+            code = example['code']
+            summary = example['summary']
+            
+            # Encode source
+            src_enc = tokenizer.encode(code).ids[:max_src_len - 2]
+            src_ids = [bos_id] + src_enc + [eos_id]
+            src_ids = src_ids + [pad_id] * (max_src_len - len(src_ids))
+            
+            # Encode target
+            tgt_enc = tokenizer.encode(summary).ids[:max_tgt_len - 2]
+            tgt_full = [bos_id] + tgt_enc + [eos_id]
+            tgt_full = tgt_full + [pad_id] * (max_tgt_len - len(tgt_full))
+            
+            src_ids = torch.tensor([src_ids], dtype=torch.long, device=device)
+            tgt_ids = torch.tensor([tgt_full], dtype=torch.long, device=device)
+            src_mask = (src_ids != pad_id).long()
+            
+            tgt_in = tgt_ids[:, :-1]
+            labels = tgt_ids[:, 1:]
+            
+            logits = model(src_ids, src_mask, tgt_in)
+            loss = criterion(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
+            
+            num_tokens = (labels != pad_id).sum().item()
+            total_loss += loss.item()
+            total_tokens += num_tokens
+    
+    avg_loss = total_loss / max(total_tokens, 1)
+    perplexity = math.exp(avg_loss)
+    return perplexity
+
+
 def evaluate_model(
     model_path: str,
     tokenizer_path: str,
@@ -44,7 +95,7 @@ def evaluate_model(
     max_samples: int = 1000,
 ):
     """
-    Evaluate model on test data and compute ROUGE, BLEU, and METEOR scores.
+    Evaluate model on test data and compute ROUGE, BLEU, METEOR, and Perplexity.
     """
     print(f"Loading model from {model_path}...")
     model, tokenizer = load_inference_model_transformer(model_path, tokenizer_path, device)
@@ -107,6 +158,11 @@ def evaluate_model(
     for key in all_scores:
         avg_scores[key] = sum(all_scores[key]) / len(all_scores[key])
     
+    # Compute perplexity
+    print("\nComputing perplexity...")
+    perplexity = compute_perplexity(model, tokenizer, examples, device)
+    avg_scores['perplexity'] = perplexity
+    
     print("\n" + "="*50)
     print("EVALUATION SCORES")
     print("="*50)
@@ -116,8 +172,9 @@ def evaluate_model(
     print(f"  ROUGE-L: {avg_scores['rougeL']:.4f}")
     print("-"*50)
     print("Other Metrics:")
-    print(f"  BLEU:    {avg_scores['bleu']:.4f}")
-    print(f"  METEOR:  {avg_scores['meteor']:.4f}")
+    print(f"  BLEU:       {avg_scores['bleu']:.4f}")
+    print(f"  METEOR:     {avg_scores['meteor']:.4f}")
+    print(f"  Perplexity: {avg_scores['perplexity']:.2f}")
     print("="*50)
     
     # Show some examples
