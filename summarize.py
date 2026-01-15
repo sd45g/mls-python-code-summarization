@@ -11,93 +11,11 @@ import os
 import sys
 import argparse
 
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add scripts folder to path so we can import inference
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts'))
 
 import torch
-from tokenizers import Tokenizer
-from src.transformer_model import TransformerSeq2Seq
-
-
-def load_model(model_path: str, tokenizer_path: str, device: str):
-    """Load the trained model and tokenizer."""
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model not found at {model_path}")
-    if not os.path.exists(tokenizer_path):
-        raise FileNotFoundError(f"Tokenizer not found at {tokenizer_path}")
-
-    tokenizer = Tokenizer.from_file(tokenizer_path)
-    vocab_size = tokenizer.get_vocab_size()
-
-    pad_id = tokenizer.token_to_id("[PAD]")
-    if pad_id is None:
-        raise ValueError("Tokenizer missing [PAD] token")
-
-    # Model config must match training
-    model = TransformerSeq2Seq(
-        vocab_size=vocab_size,
-        d_model=512,
-        nhead=8,
-        num_encoder_layers=6,
-        num_decoder_layers=6,
-        dim_feedforward=2048,
-        dropout=0.0,
-        pad_id=pad_id,
-    ).to(device)
-
-    ckpt = torch.load(model_path, map_location=device)
-    if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
-        model.load_state_dict(ckpt["model_state_dict"], strict=True)
-    else:
-        model.load_state_dict(ckpt, strict=True)
-
-    model.eval()
-    return model, tokenizer
-
-
-def summarize(model, tokenizer, code: str, device: str, max_src_len: int = 256, max_gen_len: int = 64) -> str:
-    """Generate a summary for the given code."""
-    if not code.strip():
-        return ""
-
-    bos_id = tokenizer.token_to_id("[BOS]")
-    eos_id = tokenizer.token_to_id("[EOS]")
-    pad_id = tokenizer.token_to_id("[PAD]")
-
-    if bos_id is None or eos_id is None or pad_id is None:
-        raise ValueError("Tokenizer must contain [BOS], [EOS], [PAD]")
-
-    # Encode with BOS/EOS tokens
-    enc = tokenizer.encode(code)
-    ids = enc.ids[:max_src_len - 2]
-    ids = [bos_id] + ids + [eos_id]
-    if len(ids) < max_src_len:
-        ids = ids + [pad_id] * (max_src_len - len(ids))
-
-    src_ids = torch.tensor([ids], dtype=torch.long, device=device)
-    src_mask = (src_ids != pad_id).long()
-
-    with torch.no_grad():
-        sequences = model.generate(
-            src_ids=src_ids,
-            src_mask=src_mask,
-            max_len=max_gen_len,
-            bos_id=bos_id,
-            eos_id=eos_id,
-        )
-
-    gen_ids = sequences[0]
-
-    # Remove BOS
-    if gen_ids and gen_ids[0] == bos_id:
-        gen_ids = gen_ids[1:]
-
-    # Cut at EOS
-    if eos_id in gen_ids:
-        gen_ids = gen_ids[:gen_ids.index(eos_id)]
-
-    summary = tokenizer.decode(gen_ids).strip()
-    return summary
+from inference import load_inference_model_transformer, summarize_code_transformer
 
 
 def main():
@@ -148,11 +66,11 @@ Examples:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     print(f"Loading model from {args.model}...")
-    model, tokenizer = load_model(args.model, args.tokenizer, device)
+    model, tokenizer = load_inference_model_transformer(args.model, args.tokenizer, device)
     
     print(f"\nInput code:\n{args.input}\n")
     
-    summary = summarize(model, tokenizer, args.input, device)
+    summary = summarize_code_transformer(model, tokenizer, args.input, device)
     
     print(f"Generated summary:\n{summary}")
 
