@@ -1,3 +1,10 @@
+"""
+Transformer Encoder-Decoder model for code summarization.
+
+This module implements:
+- PositionalEncoding: Sinusoidal positional encoding for sequence position info
+- TransformerSeq2Seq: Full encoder-decoder transformer for sequence-to-sequence tasks
+"""
 
 import math
 import torch
@@ -5,27 +12,48 @@ import torch.nn as nn
 
 
 class PositionalEncoding(nn.Module):
+    """
+    Sinusoidal positional encoding to inject sequence position information.
+    
+    Uses sine and cosine functions of different frequencies as described in
+    "Attention Is All You Need" (Vaswani et al., 2017).
+    """
+    
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        """
+        Args:
+            d_model: Dimension of the model embeddings
+            dropout: Dropout probability
+            max_len: Maximum sequence length to pre-compute
+        """
         super().__init__()
         self.dropout = nn.Dropout(dropout)
 
+        # Pre-compute positional encodings
         pe = torch.zeros(max_len, d_model)  # [max_len, d_model]
         position = torch.arange(0, max_len).unsqueeze(1)  # [max_len, 1]
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
 
-        pe[:, 0::2] = torch.sin(position * div_term)  # even
-        pe[:, 1::2] = torch.cos(position * div_term)  # odd
+        pe[:, 0::2] = torch.sin(position * div_term)  # even indices
+        pe[:, 1::2] = torch.cos(position * div_term)  # odd indices
         pe = pe.unsqueeze(0)  # [1, max_len, d_model]
 
         self.register_buffer("pe", pe)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: [B, T, E]
+        """Add positional encoding to input embeddings."""
+        # x: [batch_size, seq_len, d_model]
         x = x + self.pe[:, : x.size(1)]
         return self.dropout(x)
 
 
 class TransformerSeq2Seq(nn.Module):
+    """
+    Transformer encoder-decoder model for sequence-to-sequence tasks.
+    
+    Used for code summarization: encodes source code and generates natural language summaries.
+    """
+    
     def __init__(
         self,
         vocab_size: int,
@@ -37,15 +65,27 @@ class TransformerSeq2Seq(nn.Module):
         dropout: float = 0.1,
         pad_id: int = 0,
     ):
+        """
+        Args:
+            vocab_size: Size of the vocabulary
+            d_model: Dimension of embeddings and hidden states
+            nhead: Number of attention heads
+            num_encoder_layers: Number of encoder transformer layers
+            num_decoder_layers: Number of decoder transformer layers
+            dim_feedforward: Dimension of feedforward network
+            dropout: Dropout probability
+            pad_id: Padding token ID
+        """
         super().__init__()
         self.d_model = d_model
         self.pad_id = pad_id
 
+        # Embeddings for source (code) and target (summary)
         self.src_embedding = nn.Embedding(vocab_size, d_model, padding_idx=pad_id)
         self.tgt_embedding = nn.Embedding(vocab_size, d_model, padding_idx=pad_id)
         self.pos = PositionalEncoding(d_model, dropout=dropout)
 
-        # batch_first=True => tensors are [B, T, E]
+        # Transformer with batch_first=True for [B, T, E] tensor format
         self.transformer = nn.Transformer(
             d_model=d_model,
             nhead=nhead,
@@ -54,9 +94,10 @@ class TransformerSeq2Seq(nn.Module):
             dim_feedforward=dim_feedforward,
             dropout=dropout,
             batch_first=True,
-            norm_first=True,
+            norm_first=True,  # Pre-layer normalization for stability
         )
 
+        # Output projection to vocabulary
         self.out = nn.Linear(d_model, vocab_size)
 
     def _causal_mask(self, T: int, device):

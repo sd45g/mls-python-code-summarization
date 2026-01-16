@@ -112,11 +112,8 @@ def main():
     SUBSET_VAL = 10_000
     SEED = 42
 
-    # --- SAVE PATHS ---
-    # Primary: Google Drive (Colab persistence)
+    # --- SAVE PATH (Google Drive) ---
     SAVE_DIR = "/content/drive/MyDrive/mls-python-code-summarization/models"
-    # Secondary: Local models folder (for GitHub repo)
-    LOCAL_SAVE_DIR = "models"
     RESUME_PATH = f"{SAVE_DIR}/last.pt"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -124,11 +121,9 @@ def main():
     print(f"Train file: {train_path}")
     print(f"Val file:   {val_path}")
     print(f"Resume: {RESUME_PATH}")
-    print(f"Save dir (Drive): {SAVE_DIR}")
-    print(f"Save dir (Local): {LOCAL_SAVE_DIR}")
+    print(f"Save dir: {SAVE_DIR}")
 
     os.makedirs(SAVE_DIR, exist_ok=True)
-    os.makedirs(LOCAL_SAVE_DIR, exist_ok=True)
 
     collator = Collator(tokenizer_path, max_src_len=max_src_len, max_tgt_len=max_tgt_len)
     pad_id = collator.pad_id
@@ -190,7 +185,6 @@ def main():
         lr=lr,
         weight_decay=weight_decay,
         save_dir=SAVE_DIR,
-        local_save_dir=LOCAL_SAVE_DIR,
         resume_path=RESUME_PATH,
         log_every=log_every,
         clip_grad=clip_grad
@@ -198,22 +192,21 @@ def main():
 
     # ========== VERIFICATION: Confirm model was saved ==========
     print("\n" + "="*60)
-    print("VERIFYING MODEL FILES")
+    print("VERIFYING MODEL FILES SAVED TO GOOGLE DRIVE")
     print("="*60)
     
-    for label, dir_path in [("Google Drive", SAVE_DIR), ("Local (models/)", LOCAL_SAVE_DIR)]:
-        if os.path.exists(dir_path):
-            files = [f for f in os.listdir(dir_path) if f.endswith('.pt')]
-            if files:
-                print(f"\n✅ {label}: {dir_path}")
-                for f in files:
-                    fpath = os.path.join(dir_path, f)
-                    size_mb = os.path.getsize(fpath) / (1024 * 1024)
-                    print(f"   📁 {f}: {size_mb:.2f} MB")
-            else:
-                print(f"\n❌ {label}: No .pt files found in {dir_path}")
+    if os.path.exists(SAVE_DIR):
+        files = [f for f in os.listdir(SAVE_DIR) if f.endswith('.pt')]
+        if files:
+            print(f"\n✅ Model directory: {SAVE_DIR}")
+            for f in files:
+                fpath = os.path.join(SAVE_DIR, f)
+                size_mb = os.path.getsize(fpath) / (1024 * 1024)
+                print(f"   📁 {f}: {size_mb:.2f} MB")
         else:
-            print(f"\n❌ {label}: Directory does NOT exist: {dir_path}")
+            print(f"\n❌ No .pt files found in {SAVE_DIR}")
+    else:
+        print(f"\n❌ Directory does NOT exist: {SAVE_DIR}")
     
     print("\n" + "="*60)
     print("✅ Training complete!")

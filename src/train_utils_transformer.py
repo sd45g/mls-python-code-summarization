@@ -171,7 +171,7 @@ def run_epoch(
 def train_model(
     model, train_loader, val_loader, device, pad_id,
     epochs_total=10, lr=3e-4, weight_decay=0.01,
-    save_dir="models", local_save_dir=None, log_every=200, clip_grad=1.0,
+    save_dir="models", log_every=200, clip_grad=1.0,
     resume_path=None
 ):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -233,15 +233,9 @@ def train_model(
         if val_loss < best_val:
             best_val = val_loss
             save_checkpoint(f"{save_dir}/best.pt", model, optimizer, epoch, val_loss, best_val)
-            # Also save to local folder for GitHub
-            if local_save_dir:
-                save_checkpoint(f"{local_save_dir}/best.pt", model, optimizer, epoch, val_loss, best_val)
             print("  ✔ Saved new best model")
 
         save_checkpoint(f"{save_dir}/last.pt", model, optimizer, epoch, val_loss, best_val)
-        # Also save to local folder
-        if local_save_dir:
-            save_checkpoint(f"{local_save_dir}/last.pt", model, optimizer, epoch, val_loss, best_val)
 
         early_stopping(val_loss)
         if early_stopping.early_stop:
