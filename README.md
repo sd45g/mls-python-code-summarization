@@ -46,13 +46,13 @@ Dependencies:
 
 ### Training (on Google Colab)
 
-**Step 1: Preprocess Data** (first time only)
+**Step 1: Preprocess Data** 
 
 ```bash
 python scripts/preprocess_data.py
 ```
 
-**Step 2: Train Tokenizer** (first time only)
+**Step 2: Train Tokenizer**
 
 ```bash
 python scripts/train_tokenizer.py
@@ -135,3 +135,4 @@ The model is automatically loaded from Google Drive when running `summarize.py` 
 - Ahmad Sohail Najib
 
 **GitHub Repository**: https://github.com/sd45g/mls-python-code-summarization
+
