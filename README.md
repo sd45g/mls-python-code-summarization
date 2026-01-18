@@ -18,7 +18,6 @@ drive.mount('/content/drive')
 # Clone repository
 !git clone https://github.com/sd45g/mls-python-code-summarization.git
 %cd mls-python-code-summarization
-!git checkout fix/improve-model-training
 
 # Install dependencies
 !pip install -r requirements.txt
@@ -135,4 +134,5 @@ The model is automatically loaded from Google Drive when running `summarize.py` 
 - Ahmad Sohail Najib
 
 **GitHub Repository**: https://github.com/sd45g/mls-python-code-summarization
+
 
